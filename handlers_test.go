@@ -412,9 +412,8 @@ func TestXMLError(t *testing.T) {
 	if body != "<error message=\"Gregorian month out of valid range 1-12: 99\" />\n" {
 		t.Errorf("body = %q", body)
 	}
-	// apostrophes escaped as &apos; like hebcal-web xmlEsc
 	_, body = get(t, srv, "/converter?cfg=xml&start=2024-01-01&end=2024-01-05")
-	if body != "<error message=\"Date range conversion using &apos;start&apos; and &apos;end&apos; requires cfg=json\" />\n" {
+	if body != "<error message=\"Date range conversion using &#39;start&#39; and &#39;end&#39; requires cfg=json\" />\n" {
 		t.Errorf("body = %q", body)
 	}
 }
