@@ -114,7 +114,7 @@ func (app *appServer) converterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !p.noCache {
-		etag := makeETag(r, etagExtra(p))
+		etag := makeETag(r, "")
 		w.Header().Set("ETag", etag)
 		// RFC 7232 §4.1: a 304 SHOULD carry the same Cache-Control
 		// it would have sent on a 200
@@ -185,7 +185,7 @@ func (app *appServer) csvHandler(w http.ResponseWriter, r *http.Request) {
 	if !p.noCache && r.URL.RawQuery != "" {
 		w.Header().Set("Cache-Control", cacheControl7Days)
 	}
-	etag := makeETag(r, etagExtra(p))
+	etag := makeETag(r, "")
 	w.Header().Set("ETag", etag)
 	if checkFresh(r, etag) {
 		w.WriteHeader(http.StatusNotModified)

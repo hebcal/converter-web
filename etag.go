@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"hash/fnv"
 	"net/http"
-	"net/url"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -50,7 +49,9 @@ func makeETag(r *http.Request, extra string) string {
 			h.Write([]byte{0})
 		}
 	}
-	h.Write([]byte(extra))
+	if extra != "" {
+		h.Write([]byte(extra))
+	}
 	h.Write([]byte{0})
 	// vary the tag by encoding class, like hebcal-web does
 	enc := r.Header.Get("Accept-Encoding")
@@ -63,27 +64,6 @@ func makeETag(r *http.Request, extra string) string {
 	}
 	sum := h.Sum(nil)
 	return `W/"` + base64.RawURLEncoding.EncodeToString(sum) + `"`
-}
-
-// etagExtra builds a canonical representation of the parsed conversion for
-// inclusion in the ETag.
-func etagExtra(p convProps) string {
-	var b strings.Builder
-	if p.isRange {
-		b.WriteString("range:")
-		b.WriteString(url.QueryEscape(gregFromRD(p.startRD).String()))
-		b.WriteString("-")
-		b.WriteString(url.QueryEscape(gregFromRD(p.endRD).String()))
-	} else {
-		b.WriteString("single:")
-		b.WriteString(p.dt.String())
-		b.WriteString(",")
-		b.WriteString(p.hd.String())
-		if p.gs {
-			b.WriteString(",gs")
-		}
-	}
-	return b.String()
 }
 
 // checkFresh reports whether the client's cached copy identified by
