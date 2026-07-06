@@ -116,14 +116,13 @@ func (app *appServer) converterHandler(w http.ResponseWriter, r *http.Request) {
 	if !p.noCache {
 		etag := makeETag(r, etagExtra(p))
 		w.Header().Set("ETag", etag)
+		// RFC 7232 §4.1: a 304 SHOULD carry the same Cache-Control
+		// it would have sent on a 200
+		w.Header().Set("Cache-Control", cacheControl1Year)
 		if checkFresh(r, etag) {
-			// RFC 7232 §4.1: a 304 SHOULD carry the same Cache-Control
-			// it would have sent on a 200
-			w.Header().Set("Cache-Control", cacheControl1Year)
 			w.WriteHeader(http.StatusNotModified)
 			return
 		}
-		w.Header().Set("Cache-Control", cacheControl1Year)
 	}
 	if cfg == "xml" {
 		w.Header().Set("Content-Type", contentTypeXML)
