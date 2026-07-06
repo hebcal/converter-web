@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -729,10 +730,25 @@ func TestCSVEdgeCases(t *testing.T) {
 }
 
 func TestPingAndMetrics(t *testing.T) {
-	_, srv := testServer(t)
+	app, srv := testServer(t)
+	// /ping serves the ping file when it exists
+	pingFile := t.TempDir() + "/ping"
+	if err := os.WriteFile(pingFile, []byte("pong\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	app.pingFile = pingFile
 	resp, body := get(t, srv, "/ping")
 	if resp.StatusCode != 200 || body != "pong\n" {
 		t.Errorf("ping: %d %q", resp.StatusCode, body)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "text/plain; charset=utf-8" {
+		t.Errorf("ping Content-Type = %q", ct)
+	}
+	// ... and returns 404 when it does not
+	os.Remove(pingFile)
+	resp404, _ := get(t, srv, "/ping")
+	if resp404.StatusCode != 404 {
+		t.Errorf("ping without file: %d, want 404", resp404.StatusCode)
 	}
 	// generate at least one counted request first
 	get(t, srv, "/converter?cfg=json&gy=2026&gm=7&gd=5&g2h=1")

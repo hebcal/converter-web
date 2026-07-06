@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -16,14 +17,17 @@ const contentTypeJSON = "application/json; charset=utf-8"
 const contentTypeXML = "text/xml; charset=utf-8"
 const contentTypeCSV = "text/x-csv; charset=utf-8"
 
+const defaultPingFile = "/var/www/html/ping"
+
 // appServer holds the shared state for HTTP handlers.
 type appServer struct {
-	logger *accessLogger
-	now    func() gregDate // injectable for tests
+	logger   *accessLogger
+	now      func() gregDate // injectable for tests
+	pingFile string
 }
 
 func newAppServer(logger *accessLogger) *appServer {
-	return &appServer{logger: logger, now: todayNewYork}
+	return &appServer{logger: logger, now: todayNewYork, pingFile: defaultPingFile}
 }
 
 // mux builds the HTTP routing table.
@@ -38,10 +42,21 @@ func (app *appServer) mux() *http.ServeMux {
 	return mux
 }
 
+// pingHandler serves the contents of the ping file (like hebcal-web, which
+// serves /var/www/html/ping via koa-send). The file is read on every request
+// so operators can create or remove it to move the host in or out of
+// load-balancer rotation; a missing file yields a 404.
 func (app *appServer) pingHandler(w http.ResponseWriter, r *http.Request) {
+	body, err := os.ReadFile(app.pingFile)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Not Found\n"))
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
-	w.Write([]byte("pong\n"))
+	w.Write(body)
 }
 
 func (app *appServer) notFoundHandler(w http.ResponseWriter, r *http.Request) {

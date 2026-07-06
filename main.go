@@ -25,6 +25,8 @@ func main() {
 	}
 	port := flag.Int("port", defaultPort, "port to listen on")
 	logFile := flag.String("logfile", "", "access log file path (empty or \"-\" for stdout)")
+	pingFile := flag.String("pingfile", defaultPingFile,
+		"file served by /ping; a missing file makes /ping return 404")
 	flag.Parse()
 
 	var err error
@@ -42,6 +44,7 @@ func main() {
 	logger.Info("hebcal-converter: starting up")
 
 	app := newAppServer(logger)
+	app.pingFile = *pingFile
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", *port),
 		Handler:           app.mux(),

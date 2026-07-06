@@ -26,7 +26,10 @@ holidays/parshiyot come from
     (and the response is marked non-cacheable).
 - `GET|HEAD /converter/csv?…` — CSV download listing the Gregorian dates
   of the given Hebrew calendar date from 5 years before to 75 years after.
-- `GET /ping` — health check, responds `pong`.
+- `GET /ping` — health check. Serves the contents of `/var/www/html/ping`
+  (override with `-pingfile`) as `text/plain`, the same file hebcal-web
+  serves; returns 404 when the file is absent, so removing it takes the
+  host out of load-balancer rotation.
 - `GET /metrics` — Prometheus metrics, including `http_requests_total`.
 
 Responses include weak `ETag` validators (FNV-1a; the Node.js service uses
