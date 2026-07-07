@@ -1,4 +1,4 @@
-module github.com/hebcal/converter-web
+module github.com/hebcal/hebcal-api-go
 
 go 1.25.0
 
