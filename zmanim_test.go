@@ -139,6 +139,101 @@ func TestZmanimLatLong(t *testing.T) {
 	}
 }
 
+func TestZmanimLegacyCity(t *testing.T) {
+	srv := testServerWithDB(t)
+	resp, body := get(t, srv, "/zmanim?cfg=json&city=Jerusalem&date=2026-07-07")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
+	}
+	if !strings.Contains(body, `"city":"Jerusalem"`) || !strings.Contains(body, `"geo":"geoname"`) {
+		t.Errorf("unexpected legacy-city location: %s", body)
+	}
+}
+
+func TestZmanimLatLongLegacy(t *testing.T) {
+	srv := testServerWithDB(t)
+	// legacy degree/minute/direction form: 40°42'N 74°0'W == 40.7, -74.0
+	respLegacy, bodyLegacy := get(t, srv,
+		"/zmanim?cfg=json&ladeg=40&lamin=42&ladir=n&lodeg=74&lomin=0&lodir=w&tzid=America/New_York&date=2026-07-07")
+	if respLegacy.StatusCode != 200 {
+		t.Fatalf("legacy status = %d body=%s", respLegacy.StatusCode, bodyLegacy)
+	}
+	var legacy struct {
+		Location struct {
+			Latitude  float64 `json:"latitude"`
+			Longitude float64 `json:"longitude"`
+			Geo       string  `json:"geo"`
+		} `json:"location"`
+		Times map[string]string `json:"times"`
+	}
+	if err := json.Unmarshal([]byte(bodyLegacy), &legacy); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// west longitude is expressed as a positive magnitude + direction, so it
+	// must resolve to a negative decimal longitude (the "reversed" convention)
+	if legacy.Location.Latitude != 40.7 || legacy.Location.Longitude != -74 ||
+		legacy.Location.Geo != "pos" {
+		t.Errorf("legacy location = %+v", legacy.Location)
+	}
+	// the decimal form with the same coordinates must produce identical times
+	_, bodyDecimal := get(t, srv,
+		"/zmanim?cfg=json&latitude=40.7&longitude=-74&tzid=America/New_York&date=2026-07-07")
+	decimalTimes := decodeTimes(t, bodyDecimal)
+	for name, v := range legacy.Times {
+		if got, _ := decimalTimes[name].(string); got != v {
+			t.Errorf("legacy vs decimal mismatch for %s: %q vs %q", name, v, got)
+		}
+	}
+}
+
+func TestZmanimLatLongLegacySouthWest(t *testing.T) {
+	srv := testServerWithDB(t)
+	// ladir=s and lodir=w must negate both coordinates
+	_, body := get(t, srv,
+		"/zmanim?cfg=json&ladeg=33&lamin=52&ladir=s&lodeg=151&lomin=12&lodir=e&tzid=Australia/Sydney&date=2026-07-07")
+	var out struct {
+		Location struct {
+			Latitude  float64 `json:"latitude"`
+			Longitude float64 `json:"longitude"`
+		} `json:"location"`
+	}
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatalf("unmarshal: %v\nbody: %s", err, body)
+	}
+	if out.Location.Latitude >= 0 || out.Location.Longitude <= 0 {
+		t.Errorf("expected negative lat / positive long for S/E, got %+v", out.Location)
+	}
+}
+
+func TestZmanimLatLongLegacyTzDst(t *testing.T) {
+	srv := testServerWithDB(t)
+	// legacy tz=2&dst=israel resolves to Asia/Jerusalem (and Israel schedule)
+	_, body := get(t, srv,
+		"/zmanim?cfg=json&ladeg=31&lamin=46&ladir=n&lodeg=35&lomin=13&lodir=e&tz=2&dst=israel&date=2026-07-07")
+	if !strings.Contains(body, `"tzid":"Asia/Jerusalem"`) {
+		t.Errorf("expected tzid Asia/Jerusalem: %s", body)
+	}
+}
+
+func TestLegacyTzToTzid(t *testing.T) {
+	cases := []struct{ tz, dst, want string }{
+		{"2", "israel", "Asia/Jerusalem"},
+		{"0", "none", "UTC"},
+		{"-5", "none", "Etc/GMT-5"}, // reversed sign convention (UTC+5)
+		{"3", "none", "Etc/GMT+3"},
+		{"0", "eu", "Europe/London"},
+		{"1", "eu", "Europe/Paris"},
+		{"-5", "usa", "America/New_York"}, // tz*-1 => 5
+		{"-8", "usa", "America/Los_Angeles"},
+		{"99", "bogus", ""},
+	}
+	for _, tc := range cases {
+		if got := legacyTzToTzid(tc.tz, tc.dst); got != tc.want {
+			t.Errorf("legacyTzToTzid(%q,%q) = %q, want %q", tc.tz, tc.dst, got, tc.want)
+		}
+	}
+}
+
 func TestZmanimRange(t *testing.T) {
 	srv := testServerWithDB(t)
 	resp, body := get(t, srv,

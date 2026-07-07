@@ -83,8 +83,125 @@ func getLocationFromQuery(db *GeoDB, q url.Values) (*geoLocation, error) {
 
 	case !empty(q, "latitude") && !empty(q, "longitude"):
 		return locationFromLatLong(q, cityTypeahead)
+
+	case hasLatLongLegacy(q):
+		return locationFromLatLongLegacy(q, cityTypeahead)
 	}
 	return nil, nil
+}
+
+// geoposLegacy lists the legacy degree/minute parameters and their maximum
+// values, matching hebcal-web src/urlArgs.js.
+var geoposLegacy = []struct {
+	key string
+	max int
+}{
+	{"ladeg", 90}, {"lamin", 60}, {"lodeg", 180}, {"lomin", 60},
+}
+
+// hasLatLongLegacy reports whether all of the legacy degree/minute/direction
+// parameters are present.
+func hasLatLongLegacy(q url.Values) bool {
+	if empty(q, "ladir") || empty(q, "lodir") {
+		return false
+	}
+	for _, g := range geoposLegacy {
+		if empty(q, g.key) {
+			return false
+		}
+	}
+	return true
+}
+
+// locationFromLatLongLegacy builds a geo=pos location from the legacy
+// ladeg/lamin/ladir + lodeg/lomin/lodir degree-minute-direction form, ported
+// from the hasLatLongLegacy branch of getLocationFromQuery in location.js.
+// Unlike the decimal form, west/south are expressed as positive magnitudes
+// with a direction letter rather than negative numbers.
+func locationFromLatLongLegacy(q url.Values, cityTypeahead string) (*geoLocation, error) {
+	for _, g := range geoposLegacy {
+		v := q.Get(g.key)
+		if n, ok := parseInt(v); !ok || n > g.max {
+			return nil, badRequest("Sorry, %s=%s out of valid range 0-%d", g.key, v, g.max)
+		}
+	}
+	ladeg, _ := parseInt(q.Get("ladeg"))
+	lamin, _ := parseInt(q.Get("lamin"))
+	lodeg, _ := parseInt(q.Get("lodeg"))
+	lomin, _ := parseInt(q.Get("lomin"))
+	latitude := float64(ladeg) + float64(lamin)/60
+	longitude := float64(lodeg) + float64(lomin)/60
+	if q.Get("ladir") == "s" {
+		latitude = -latitude
+	}
+	if q.Get("lodir") == "w" {
+		longitude = -longitude
+	}
+	tzid := q.Get("tzid")
+	if tzid == "" && !empty(q, "tz") && !empty(q, "dst") {
+		tzid = legacyTzToTzid(q.Get("tz"), q.Get("dst"))
+	}
+	if tzid == "" {
+		// hebcal-web falls back to a geo-tz shape lookup here; that data is
+		// not available to this service, so a timezone is required.
+		return nil, badRequest("Timezone required")
+	}
+	if _, err := time.LoadLocation(tzid); err != nil {
+		return nil, badRequest("Invalid time zone specified: %s", tzid)
+	}
+	il := q.Get("i") == "on"
+	if tzid == "Asia/Jerusalem" {
+		il = true
+	}
+	cityName := cityTypeahead
+	if cityName == "" {
+		cityName = makeGeoCityName(latitude, longitude, tzid)
+	}
+	return &geoLocation{
+		Name:       cityName,
+		Latitude:   latitude,
+		Longitude:  longitude,
+		TimeZoneID: tzid,
+		Geo:        "pos",
+		IL:         il,
+	}, nil
+}
+
+// legacyTzToTzid resolves a legacy numeric timezone plus DST rule to an IANA
+// tzid, ported from @hebcal/core Location.legacyTzToTzid. It returns "" when
+// the combination is unrecognized. Note the reversed Etc/GMT sign convention
+// (tz=-5 becomes "Etc/GMT-5", i.e. UTC+5).
+func legacyTzToTzid(tz, dst string) string {
+	tzNum, _ := parseInt(tz)
+	switch {
+	case dst == "none":
+		if tzNum == 0 {
+			return "UTC"
+		}
+		plus := ""
+		if tzNum > 0 {
+			plus = "+"
+		}
+		return fmt.Sprintf("Etc/GMT%s%d", plus, tzNum)
+	case tzNum == 2 && dst == "israel":
+		return "Asia/Jerusalem"
+	case dst == "eu":
+		switch tzNum {
+		case -2:
+			return "Atlantic/Cape_Verde"
+		case -1:
+			return "Atlantic/Azores"
+		case 0:
+			return "Europe/London"
+		case 1:
+			return "Europe/Paris"
+		case 2:
+			return "Europe/Athens"
+		}
+	case dst == "usa":
+		return zipcodesTzMap[tzNum*-1]
+	}
+	return ""
 }
 
 // locationFromLatLong builds a geo=pos location from latitude/longitude/tzid.

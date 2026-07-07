@@ -241,8 +241,8 @@ func (db *GeoDB) lookupZip(zip string) *geoLocation {
 		elev = int(elevation.Int64)
 	}
 	loc := &geoLocation{
+		// hebcal-web's ZIP Location carries no asciiname, so we omit it too.
 		Name:       fmt.Sprintf("%s, %s %s", city, state, zip5),
-		Asciiname:  city,
 		CC:         "US",
 		Country:    "United States",
 		Admin1:     state,
