@@ -7,7 +7,11 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-ExecStart=/usr/local/bin/hebcal-api -port 8082 -logfile /var/log/hebcal/api.log
+ExecStart=/usr/local/bin/hebcal-api \
+  -port 8082 \
+  -logfile /var/log/hebcal/api.log
+  -zips-db /var/www/zips.sqlite3 \
+  -geonames-db /var/www/geonames.sqlite3
 # SIGUSR1 (or SIGHUP) reopens the access log after rotation
 ExecReload=/bin/kill -USR1 $MAINPID
 Restart=on-failure
