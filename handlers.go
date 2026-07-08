@@ -182,27 +182,28 @@ func (app *appServer) writeConverterError(w http.ResponseWriter, cfg string, err
 
 // redirectConverterNoCache 302s a date-less /converter GET to an equivalent
 // URL with gd/gm/gy pinned to today. Ported from the noCache/message check
-// in hebcal-web src/converter.js. Unlike hebcal-web, this microservice does
-// not resolve a per-request location (there is no IP geolocation for
-// /converter, only the fixed New-York "today" also used by app.now()), so
-// the redirect never appends &gs=on or &i=on: those require knowing the
-// caller's location to determine after-sunset/Israel status.
+// in hebcal-web src/converter.js, with one deliberate fix: the JS version
+// only re-appends &cfg=json (never &cfg=xml) to the redirect target, which
+// silently drops cfg=xml from the round trip. The caller only reaches this
+// function once cfg has already passed the {json,xml} gate, so cfg is
+// always one of those two values here and we preserve it either way.
+// Unlike hebcal-web, this microservice does not resolve a per-request
+// location (there is no IP geolocation for /converter, only the fixed
+// New-York "today" also used by app.now()), so the redirect never appends
+// &gs=on or &i=on: those require knowing the caller's location to
+// determine after-sunset/Israel status.
 func (app *appServer) redirectConverterNoCache(w http.ResponseWriter, q url.Values, cfg string, gd gregDate) {
-	json := ""
-	if cfg == "json" {
-		json = "&cfg=json"
-	}
 	lg := ""
 	if v := q.Get("lg"); v != "" {
 		lg = "&lg=" + url.QueryEscape(v)
 	}
-	location := fmt.Sprintf("/converter?gd=%d&gm=%d&gy=%d&g2h=1%s%s",
-		gd.Day, int(gd.Month), gd.Year, json, lg)
+	location := fmt.Sprintf("/converter?gd=%d&gm=%d&gy=%d&g2h=1&cfg=%s%s",
+		gd.Day, int(gd.Month), gd.Year, cfg, lg)
 	w.Header().Set("Cache-Control", "private, max-age=1200")
 	w.Header().Set("Location", location)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusFound)
-	fmt.Fprintf(w, "Redirecting to %s.\n", location)
+	fmt.Fprintf(w, "Redirecting to %s\n", location)
 }
 
 // csvHandler implements the /converter/csv download.
