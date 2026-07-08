@@ -276,8 +276,8 @@ func TestMissingCfg(t *testing.T) {
 		"/converter",
 	} {
 		resp, _ := get(t, srv, path)
-		if resp.StatusCode != 400 {
-			t.Errorf("%s: status = %d, want 400", path, resp.StatusCode)
+		if resp.StatusCode != 501 {
+			t.Errorf("%s: status = %d, want 501", path, resp.StatusCode)
 		}
 	}
 }
