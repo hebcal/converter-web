@@ -41,6 +41,8 @@ func (app *appServer) mux() *http.ServeMux {
 	mux.HandleFunc("/converter/", app.serve(app.converterHandler))
 	mux.HandleFunc("/zmanim", app.serve(app.zmanimHandler))
 	mux.HandleFunc("/zmanim/", app.serve(app.zmanimHandler))
+	mux.HandleFunc("/shabbat", app.serve(app.shabbatHandler))
+	mux.HandleFunc("/shabbat/", app.serve(app.shabbatHandler))
 	mux.HandleFunc("/", app.serve(app.notFoundHandler))
 	return mux
 }
