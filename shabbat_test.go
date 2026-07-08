@@ -1,0 +1,103 @@
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+	"testing"
+)
+
+// TestShabbatGating verifies the 501 scope gate: only cfg=json with leyning
+// disabled is implemented.
+func TestShabbatGating(t *testing.T) {
+	srv := testServerWithDB(t)
+	for _, path := range []string{
+		"/shabbat?geonameid=5128581",          // cfg missing
+		"/shabbat?cfg=json&geonameid=5128581", // leyning defaults on
+		"/shabbat?cfg=json&geonameid=5128581&leyning=on",
+		"/shabbat?cfg=r&geonameid=5128581&leyning=off", // unsupported cfg
+	} {
+		resp, body := get(t, srv, path)
+		if resp.StatusCode != http.StatusNotImplemented {
+			t.Errorf("%s: status = %d, want 501 (%s)", path, resp.StatusCode, body)
+		}
+	}
+}
+
+func TestShabbatOptions(t *testing.T) {
+	srv := testServerWithDB(t)
+	req, _ := http.NewRequest(http.MethodOptions, srv.URL+"/shabbat", nil)
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("OPTIONS status = %d, want 204", resp.StatusCode)
+	}
+	if m := resp.Header.Get("Access-Control-Allow-Methods"); m != "GET" {
+		t.Errorf("Allow-Methods = %q, want GET", m)
+	}
+}
+
+func TestShabbatBasic(t *testing.T) {
+	srv := testServerWithDB(t)
+	resp, body := get(t, srv, "/shabbat?cfg=json&geonameid=5128581&dt=2026-06-12&leyning=off")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
+	}
+	var out struct {
+		Title    string `json:"title"`
+		Location struct {
+			City string `json:"city"`
+		} `json:"location"`
+		Range struct {
+			Start string `json:"start"`
+			End   string `json:"end"`
+		} `json:"range"`
+		Items []struct {
+			Title    string `json:"title"`
+			Category string `json:"category"`
+			Memo     string `json:"memo"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, body)
+	}
+	if !strings.HasPrefix(out.Title, "Hebcal New York") {
+		t.Errorf("title = %q", out.Title)
+	}
+	if out.Location.City != "New York" {
+		t.Errorf("city = %q", out.Location.City)
+	}
+	cats := map[string]bool{}
+	var parsha string
+	for _, it := range out.Items {
+		cats[it.Category] = true
+		if it.Category == "parashat" {
+			parsha = it.Title
+		}
+	}
+	for _, want := range []string{"candles", "parashat", "havdalah"} {
+		if !cats[want] {
+			t.Errorf("missing item category %q in %v", want, cats)
+		}
+	}
+	if parsha != "Parashat Sh’lach" {
+		t.Errorf("parsha title = %q, want Parashat Sh’lach", parsha)
+	}
+	// candle-lighting carries the upcoming parsha as its memo
+	for _, it := range out.Items {
+		if it.Category == "candles" && it.Memo != "Parashat Sh’lach" {
+			t.Errorf("candle memo = %q, want Parashat Sh’lach", it.Memo)
+		}
+	}
+}
+
+func TestShabbatNoDB(t *testing.T) {
+	_, srv := testServer(t)
+	resp, _ := get(t, srv, "/shabbat?cfg=json&geonameid=5128581&leyning=off")
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", resp.StatusCode)
+	}
+}
