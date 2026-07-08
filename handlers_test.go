@@ -261,8 +261,9 @@ func TestDefaultsToToday(t *testing.T) {
 	if resp.Header.Get("ETag") != "" {
 		t.Errorf("unexpected ETag: %q", resp.Header.Get("ETag"))
 	}
-	if !strings.Contains(body, wantLocation) {
-		t.Errorf("expected redirect body to mention target: %s", body)
+	wantBody := "Redirecting to " + wantLocation + "\n"
+	if body != wantBody {
+		t.Errorf("redirect body = %q, want %q", body, wantBody)
 	}
 	// h2g with no params also redirects to the same pinned-date g2h URL
 	resp2, _ := get(t, srv, "/converter?cfg=json&h2g=1")
@@ -296,7 +297,7 @@ func TestMissingCfg(t *testing.T) {
 func TestBareConverterRedirects(t *testing.T) {
 	_, srv := testServer(t)
 	cases := []struct{ path, wantLocation string }{
-		{"/converter?cfg=xml", "/converter?gd=5&gm=7&gy=2026&g2h=1"},
+		{"/converter?cfg=xml", "/converter?gd=5&gm=7&gy=2026&g2h=1&cfg=xml"},
 		{"/converter?cfg=json&lg=h", "/converter?gd=5&gm=7&gy=2026&g2h=1&cfg=json&lg=h"},
 	}
 	for _, c := range cases {
