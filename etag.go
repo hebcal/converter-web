@@ -51,8 +51,8 @@ func makeETag(r *http.Request, extra string) string {
 	}
 	if extra != "" {
 		h.Write([]byte(extra))
+		h.Write([]byte{0})
 	}
-	h.Write([]byte{0})
 	// vary the tag by encoding class, like hebcal-web does
 	enc := r.Header.Get("Accept-Encoding")
 	if strings.Contains(enc, "zstd") {
