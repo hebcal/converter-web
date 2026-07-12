@@ -21,21 +21,14 @@ import (
 
 const cacheControl30Days = "public, max-age=2592000, s-maxage=2592000"
 
-// apiVersion identifies the hebcal-go library and this service in API
-// responses, mirroring hebcal-web's `${coreVersion}-${pkgVersion}`.
+// apiVersion identifies the version in service in API responses
 var apiVersion = func() string {
-	coreVer, appVer := "unknown", "unknown"
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if info.Main.Version != "" {
-			appVer = info.Main.Version
-		}
-		for _, dep := range info.Deps {
-			if dep.Path == "github.com/hebcal/hebcal-go" {
-				coreVer = dep.Version
-			}
+			return info.Main.Version
 		}
 	}
-	return coreVer + "-" + appVer
+	return "unknown"
 }()
 
 // ---------------------------------------------------------------------------

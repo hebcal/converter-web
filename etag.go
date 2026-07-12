@@ -12,16 +12,10 @@ import (
 // libraryVersions is baked into every ETag so tags change when the
 // application or the hebcal libraries are upgraded.
 var libraryVersions = func() string {
-	var b strings.Builder
 	if info, ok := debug.ReadBuildInfo(); ok {
-		b.WriteString(info.Main.Path + "@" + info.Main.Version)
-		for _, dep := range info.Deps {
-			if strings.HasPrefix(dep.Path, "github.com/hebcal/") {
-				b.WriteString("," + dep.Path + "@" + dep.Version)
-			}
-		}
+		return info.Main.Path + "@" + info.Main.Version
 	}
-	return b.String()
+	return ""
 }()
 
 // makeETag computes a weak ETag from the request path, the query string
