@@ -68,7 +68,7 @@ var (
 FROM geoname_fulltext
 WHERE geoname_fulltext MATCH ?
 ORDER BY score DESC
-LIMIT 150`, ftsWeightLongname, ftsWeightCity, ftsWeightAdmin1, ftsWeightCountry, populationWeight)
+LIMIT 100`, ftsWeightLongname, ftsWeightCity, ftsWeightAdmin1, ftsWeightCountry, populationWeight)
 
 	// zipFulltextCompleteSQL matches ZIP_FULLTEXT_COMPLETE_SQL. bm25 is
 	// deliberately not used here: its scores are corpus-relative and therefore
