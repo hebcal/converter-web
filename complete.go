@@ -11,9 +11,6 @@ import (
 	"strings"
 )
 
-// cacheControl3Days matches hebcal-web cacheControl(3): public, 3-day max-age.
-const cacheControl3Days = "public, max-age=259200, s-maxage=259200"
-
 // completeHandler implements GET /complete (and /complete.php).
 func (app *appServer) completeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
@@ -46,7 +43,7 @@ func (app *appServer) completeHandler(w http.ResponseWriter, r *http.Request) {
 	if p, err := app.geoIPClient.lookupPoint(r.Context(), callerIP); err == nil {
 		near = p
 	}
-	items := app.db.autoCompleteNear(qraw, latlong, near)
+	items := app.db.autoCompleteNear(qraw, near)
 	if len(items) == 0 {
 		// No matches: drop the ETag (matching hebcal-web) and return 404. The
 		// Cache-Control set above is retained, as in hebcal-web.

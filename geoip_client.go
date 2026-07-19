@@ -45,6 +45,21 @@ func newGeoIPClient(socketPath string) *geoIPClient {
 	}
 }
 
+// dialSocket verifies connectivity to the GeoIP unix domain socket by opening
+// and immediately closing a connection. It returns any dial error (whose string
+// carries the underlying errno reason, e.g. "no such file or directory").
+func (c *geoIPClient) dialSocket(ctx context.Context) error {
+	if c == nil || c.socketPath == "" {
+		return errors.New("missing geoip socket path")
+	}
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "unix", c.socketPath)
+	if err != nil {
+		return err
+	}
+	return conn.Close()
+}
+
 func (c *geoIPClient) lookupPoint(ctx context.Context, ip string) (*geoIPPoint, error) {
 	if c == nil || c.socketPath == "" || ip == "" {
 		return nil, errors.New("missing geoip client or ip")

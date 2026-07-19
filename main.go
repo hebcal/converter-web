@@ -63,12 +63,23 @@ func main() {
 	app.pingFile = *pingFile
 	app.geoIPClient = newGeoIPClient(*socket)
 
+	// Probe the GeoIP unix domain socket at startup so operators see whether
+	// the geoip2 service is reachable. A failure is not fatal: /complete still
+	// works without IP-based location hints.
+	probeCtx, probeCancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	if err := app.geoIPClient.dialSocket(probeCtx); err != nil {
+		logger.Warn(fmt.Sprintf("GeoIP unix socket %s not reachable: %v", *socket, err))
+	} else {
+		logger.Info("GeoIP unix socket connected: " + *socket)
+	}
+	probeCancel()
+
 	// Open the geonames/zips databases for the /zmanim API. A failure here is
 	// not fatal: the /zmanim route reports 503 while the other APIs keep
 	// working, so an operator can run the server without the location data.
 	db, err := NewGeoDB(*zipsDB, *geonamesDB)
 	if err != nil {
-		logger.Info("cannot open location databases; /zmanim disabled: " + err.Error())
+		logger.Warn("cannot open location databases; /zmanim disabled: " + err.Error())
 		fmt.Fprintln(os.Stderr, "warning: /zmanim disabled:", err)
 	} else {
 		app.db = db

@@ -9,7 +9,9 @@ all: build
 
 # sqlite_fts5 enables the FTS5 extension in mattn/go-sqlite3, required by the
 # /complete autocomplete queries against the geoname/ZIP full-text tables.
-GOTAGS := sqlite_fts5
+# sqlite_math_functions enables SQLITE_ENABLE_MATH_FUNCTIONS (e.g. ln()), used
+# by the autocomplete relevance-scoring SQL.
+GOTAGS := sqlite_fts5,sqlite_math_functions
 
 build:
 	CGO_ENABLED=1 go build -tags $(GOTAGS) -trimpath -ldflags="-s -w" -o $(BIN) .

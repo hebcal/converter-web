@@ -217,6 +217,11 @@ func (lg *accessLogger) Info(msg string) {
 	lg.write(levelInfo, []kv{{"msg", jsonString(msg)}})
 }
 
+// Warn logs a warning-level message.
+func (lg *accessLogger) Warn(msg string) {
+	lg.write(levelWarn, []kv{{"msg", jsonString(msg)}})
+}
+
 // logAccess writes one access-log line, similar to hebcal-web makeLogInfo().
 func (app *appServer) logAccess(r *http.Request, bw *bufWriter, length int, start time.Time) {
 	fields := []kv{

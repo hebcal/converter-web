@@ -59,6 +59,89 @@ func TestCompleteGeonameLatLong(t *testing.T) {
 	}
 }
 
+// TestCompleteUTF8Latin exercises a query carrying non-ASCII Latin bytes (the
+// "Völ" prefix of Völkermarkt, Austria). The FTS "city" column keeps the
+// accented spelling while the geoname asciiname is "Voelkermarkt", so the
+// accented query must round-trip through the request, the FTS MATCH, and the
+// JSON response intact.
+func TestCompleteUTF8Latin(t *testing.T) {
+	srv := testServerWithDB(t)
+	resp, body := get(t, srv, "/complete?q=Völ")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
+	}
+	want := `[{"id":2762315,"value":"Völkermarkt, Carinthia, Austria","admin1":"Carinthia","country":"Austria","cc":"AT","geo":"geoname","name":"Völkermarkt","asciiname":"Voelkermarkt","flag":"🇦🇹"}]`
+	if body != want {
+		t.Errorf("body mismatch\n got: %s\nwant: %s", body, want)
+	}
+}
+
+// TestCompleteUTF8Hebrew exercises a query written entirely in Hebrew
+// (ירושלים = Jerusalem). It resolves to the same geoname (281184) that the
+// romanized "Jerusa" query returns in TestCompleteGeoname, confirming the
+// multi-byte RTL query bytes survive the round trip. Because the Hebrew FTS row
+// matched, the response echoes the Hebrew city name ("name") and country.
+func TestCompleteUTF8Hebrew(t *testing.T) {
+	srv := testServerWithDB(t)
+	resp, body := get(t, srv, "/complete?q=ירושלים")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
+	}
+	want := `[{"id":281184,"value":"Jerusalem, Israel","admin1":"Jerusalem District","country":"ישראל","cc":"IL","geo":"geoname","name":"ירושלים","asciiname":"Jerusalem","flag":"🇮🇱"}]`
+	if body != want {
+		t.Errorf("body mismatch\n got: %s\nwant: %s", body, want)
+	}
+}
+
+// TestCompleteUTF8LeadingNonASCII exercises a query whose first bytes are
+// non-ASCII (Ḏânan, Djibouti — starting "Ḏâ"). The value carries the accented
+// spelling from the geoname table, confirming multi-byte content survives from
+// the URL query all the way into the JSON response.
+func TestCompleteUTF8LeadingNonASCII(t *testing.T) {
+	srv := testServerWithDB(t)
+	resp, body := get(t, srv, "/complete?q=Ḏân")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
+	}
+	want := `[{"id":224152,"value":"Ḏânan, Ali Sabieh Region, Djibouti","admin1":"Ali Sabieh Region","country":"Djibouti","cc":"DJ","geo":"geoname","asciiname":"Danan","flag":"🇩🇯"}]`
+	if body != want {
+		t.Errorf("body mismatch\n got: %s\nwant: %s", body, want)
+	}
+}
+
+// TestCompleteLongnameGeoname exercises a full "City, Admin1, Country" query
+// against the geoname longname column (the {longname} branch of the FTS MATCH),
+// which is what lets a multi-word query span the city/admin1/country boundary.
+// The accented "Montréal" folds to "montreal" and the trailing "C" prefix
+// matches "Canada".
+func TestCompleteLongnameGeoname(t *testing.T) {
+	srv := testServerWithDB(t)
+	resp, body := get(t, srv, "/complete?q=Montr%C3%A9al%2C+Quebec%2C+C")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
+	}
+	want := `[{"id":6077243,"value":"Montreal, Quebec, Canada","admin1":"Quebec","country":"Canada","cc":"CA","geo":"geoname","asciiname":"Montreal","flag":"🇨🇦"}]`
+	if body != want {
+		t.Errorf("body mismatch\n got: %s\nwant: %s", body, want)
+	}
+}
+
+// TestCompleteLongnameZip exercises a full "City, ST ZIP3" query against the ZIP
+// city fulltext longname column, where the trailing "029" prefix-matches the
+// "02906" ZIP code. This is the text (not numeric-prefix) ZIP path, since the
+// query does not start with a digit.
+func TestCompleteLongnameZip(t *testing.T) {
+	srv := testServerWithDB(t)
+	resp, body := get(t, srv, "/complete?q=Providence%2C+RI+029")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d body=%s", resp.StatusCode, body)
+	}
+	want := `[{"id":"02906","value":"Providence, RI 02906","admin1":"RI","asciiname":"Providence","country":"United States","cc":"US","geo":"zip","flag":"🇺🇸"}]`
+	if body != want {
+		t.Errorf("body mismatch\n got: %s\nwant: %s", body, want)
+	}
+}
+
 func TestCompleteZipText(t *testing.T) {
 	srv := testServerWithDB(t)
 	resp, body := get(t, srv, "/complete?q=Bever")
